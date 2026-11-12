@@ -1,0 +1,20 @@
+import tkinter as tk
+from tkinter import ttk, messagebox, scrolledtext
+from abc import ABC, abstractmethod
+from datetime import datetime
+import logging
+import uuid
+
+
+# =====================================================
+# 1. CONFIGURACIoN DEL SISTEMA DE REGISTRO (LOGS)
+# =====================================================
+
+logging.basicConfig(
+    filename="software_fj.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    encoding="utf-8"
+)
+
+logger = logging.getLogger("SoftwareFJ")
