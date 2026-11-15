@@ -5,9 +5,8 @@ from datetime import datetime
 import logging
 import uuid
 
-
 # =====================================================
-# 1. CONFIGURACIoN DEL SISTEMA DE REGISTRO (LOGS)
+# 1. Configuracion del Sistema de  Registro  (LOGS)
 # =====================================================
 
 logging.basicConfig(
@@ -18,3 +17,421 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("SoftwareFJ")
+
+# =====================================================
+# 2. Excepciones  Personalizadas 
+# =====================================================
+
+class ErrorSistema(Exception):
+    """General system exception."""
+    pass
+
+class DatosInvalidosError(ErrorSistema):
+    pass
+
+class ClienteNoEncontradoError(ErrorSistema):
+    pass
+
+class ServicioNoDisponibleError(ErrorSistema):
+    pass
+
+class ReservaInvalidaError(ErrorSistema):
+    pass
+
+class OperacionNoPermitidaError(ErrorSistema):
+    pass
+
+# =====================================================
+# 3.  Clase  Abstracta Entidad 
+# =====================================================
+
+class Entidad(ABC):
+
+    def __init__(self, identificador):
+        self._identificador = identificador
+
+    @property
+    def identificador(self):
+        return self._identificador
+
+    @abstractmethod
+    def describir(self):
+        pass
+
+# =====================================================
+# 4. Clase Cliente
+# =====================================================
+
+class Cliente(Entidad):
+
+    def __init__(self, nombre, correo, telefono):
+        super().__init__(str(uuid.uuid4())[:8])
+        self.__nombre = self.validar_texto(nombre, "name")
+        self.__correo = self.validar_correo(correo)
+        self.__telefono = self.validar_telefono(telefono)
+
+    @staticmethod
+    def validar_texto(valor, campo):
+        if not isinstance(valor, str) or not valor.strip():
+            raise DatosInvalidosError(f"The {campo} field cannot be empty.")
+        return valor.strip()
+
+    @staticmethod
+    def validar_correo(correo):
+        if not isinstance(correo, str):
+            raise DatosInvalidosError("Email must be text.")
+        correo = correo.strip()
+        if "@" not in correo or "." not in correo.split("@")[-1]:
+            raise DatosInvalidosError("The email address is not valid.")
+        return correo
+
+    @staticmethod
+    def validar_telefono(telefono):
+        telefono = str(telefono).strip()
+        if not telefono.isdigit() or len(telefono) < 7:
+            raise DatosInvalidosError("The phone number is not valid.")
+        return telefono
+
+    @property
+    def nombre(self):
+        return self.__nombre
+
+    @property
+    def correo(self):
+        return self.__correo
+
+    @property
+    def telefono(self):
+        return self.__telefono
+
+    def describir(self):
+        return f"Client: {self.__nombre} | Email: {self.__correo} | Phone: {self.__telefono}"
+
+# =====================================================
+# 5. Abstract  Class Servicio
+# =====================================================
+
+class Servicio(Entidad, ABC):
+
+    def __init__(self, nombre, precio):
+        super().__init__(str(uuid.uuid4())[:8])
+        if not isinstance(precio, (int, float)) or isinstance(precio, bool) or precio <= 0:
+            raise DatosInvalidosError("Price must be greater than zero.")
+        self._nombre = nombre
+        self._precio = float(precio)
+        self._disponible = True
+
+    @property
+    def nombre(self):
+        return self._nombre
+
+    @property
+    def precio(self):
+        return self._precio
+
+    @property
+    def disponible(self):
+        return self._disponible
+
+    def cambiar_disponibilidad(self, estado):
+        if not isinstance(estado, bool):
+            raise DatosInvalidosError("Availability must be true or false.")
+        self._disponible = estado
+
+    def validar_parametros(self, duracion):
+        if not isinstance(duracion, (int, float)):
+            raise DatosInvalidosError("Duration must be numeric.")
+        if isinstance(duracion, bool) or duracion <= 0:
+            raise DatosInvalidosError("Duration must be greater than zero.")
+
+    # Overloading with default arguments:
+    # calcular_costo(duracion)
+    # calcular_costo(duracion, impuesto)
+    # calcular_costo(duracion, impuesto, descuento)
+
+    def calcular_costo(self, duracion, impuesto=0, descuento=0):
+        self.validar_parametros(duracion)
+        if not isinstance(impuesto, (int, float)) or isinstance(impuesto, bool):
+            raise DatosInvalidosError("Tax must be numeric.")
+        if not isinstance(descuento, (int, float)) or isinstance(descuento, bool):
+            raise DatosInvalidosError("Discount must be numeric.")
+        if not 0 <= impuesto <= 100:
+            raise DatosInvalidosError("Tax must be between 0 and 100.")
+        if not 0 <= descuento <= 100:
+            raise DatosInvalidosError("Discount must be between 0 and 100.")
+        subtotal = self._precio * duracion
+        valor_descuento = subtotal * descuento / 100
+        total = (subtotal - valor_descuento) * (1 + impuesto / 100)
+        return round(total, 2)
+
+    @abstractmethod
+    def describir(self):
+        pass
+
+    @abstractmethod
+    def validar_servicio(self, duracion):
+        pass
+
+# =====================================================
+# 6. Room Reservattion Services
+# =====================================================
+
+class ReservaSala(Servicio):
+    def __init__(self):
+        super().__init__("Room Reservation", 50000)
+
+    def validar_servicio(self, duracion):
+        self.validar_parametros(duracion)
+        if duracion > 12:
+            raise ServicioNoDisponibleError("The room cannot be reserved for more than 12 hours.")
+
+    def describir(self):
+        return f"{self.nombre} - ${self.precio:,.0f} per hour"
+
+    def calcular_costo(self, duracion, impuesto=0, descuento=0):
+        self.validar_servicio(duracion)
+        return super().calcular_costo(duracion, impuesto, descuento)
+
+# =====================================================
+# 7. Equipment Rental  Service
+# =====================================================
+
+class AlquilerEquipos(Servicio):
+    def __init__(self):
+        super().__init__("Equipment Rental", 35000)
+
+    def validar_servicio(self, duracion):
+        self.validar_parametros(duracion)
+        if duracion > 24:
+            raise ServicioNoDisponibleError("Equipment rental cannot exceed 24 hours.")
+
+    def describir(self):
+        return f"{self.nombre} - ${self.precio:,.0f} per hour"
+
+    def calcular_costo(self, duracion, impuesto=0, descuento=0):
+        self.validar_servicio(duracion)
+        return super().calcular_costo(duracion, impuesto, descuento)
+
+# =====================================================
+# 8. Specialized Consuting Service
+# =====================================================
+
+class AsesoriaEspecializada(Servicio):
+    def __init__(self):
+        super().__init__("Specialized Consulting", 80000)
+
+    def validar_servicio(self, duracion):
+        self.validar_parametros(duracion)
+        if duracion > 8:
+            raise ServicioNoDisponibleError("Consulting cannot exceed 8 hours per reservation.")
+
+    def describir(self):
+        return f"{self.nombre} - ${self.precio:,.0f} per hour"
+
+    def calcular_costo(self, duracion, impuesto=0, descuento=0):
+        self.validar_servicio(duracion)
+        return super().calcular_costo(duracion, impuesto, descuento)
+
+# =====================================================
+# 9. Class Reserva
+# =====================================================
+
+class Reserva(Entidad):
+
+    def __init__(self, cliente, servicio, duracion):
+        super().__init__(str(uuid.uuid4())[:8])
+        if not isinstance(cliente, Cliente):
+            raise DatosInvalidosError("You must select a valid client.")
+        if not isinstance(servicio, Servicio):
+            raise DatosInvalidosError("You must select a valid service.")
+        servicio.validar_servicio(duracion)
+        if not servicio.disponible:
+            raise ServicioNoDisponibleError("The selected service is not available.")
+        self.__cliente = cliente
+        self.__servicio = servicio
+        self.__duracion = duracion
+        self.__estado = "Pending"
+        self.__fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    @property
+    def cliente(self):
+        return self.__cliente
+
+    @property
+    def servicio(self):
+        return self.__servicio
+
+    @property
+    def duracion(self):
+        return self.__duracion
+
+    @property
+    def estado(self):
+        return self.__estado
+
+    def confirmar(self):
+        if self.__estado != "Pending":
+            raise OperacionNoPermitidaError("Only pending reservations can be confirmed.")
+        if not self.__servicio.disponible:
+            raise ServicioNoDisponibleError("The service is no longer available.")
+        self.__estado = "Confirmed"
+        logger.info(f"Reservation {self.identificador} confirmed.")
+
+    def cancelar(self):
+        if self.__estado == "Cancelled":
+            raise OperacionNoPermitidaError("The reservation is already cancelled.")
+        self.__estado = "Cancelled"
+        logger.info(f"Reservation {self.identificador} cancelled.")
+
+    def procesar(self, impuesto=19, descuento=0):
+        try:
+            if self.__estado != "Confirmed":
+                raise OperacionNoPermitidaError("The reservation must be confirmed to be processed.")
+            total = self.__servicio.calcular_costo(self.__duracion, impuesto, descuento)
+            if total < 0:
+                raise ErrorSistema("Cost calculation is inconsistent.")
+            return total
+        except Exception as error:
+            logger.exception("Error while processing the reservation.")
+            raise ErrorSistema("It was not possible to process the reservation.") from error
+        finally:
+            logger.info(f"Finished processing attempt for reservation {self.identificador}.")
+
+    def describir(self):
+        return f"Reservation: {self.identificador} | Client: {self.cliente.nombre} | Service: {self.servicio.nombre} | Duration: {self.duracion} hours | Status: {self.estado}"
+
+# =====================================================
+# 10. System Manager Class
+# =====================================================
+
+class GestorSistema:
+    def __init__(self):
+        self.clientes = []
+        self.servicios = [ReservaSala(), AlquilerEquipos(), AsesoriaEspecializada()]
+        self.reservas = []
+
+    def registrar_cliente(self, cliente):
+        if not isinstance(cliente, Cliente):
+            raise DatosInvalidosError("The client is not valid.")
+        if any(c.correo.lower() == cliente.correo.lower() for c in self.clientes):
+            raise DatosInvalidosError("The email is already registered.")
+        self.clientes.append(cliente)
+        logger.info(f"Client registered: {cliente.nombre}")
+        return cliente
+
+    def buscar_cliente(self, identificador):
+        for cliente in self.clientes:
+            if cliente.identificador == identificador:
+                return cliente
+        raise ClienteNoEncontradoError("Client not found.")
+
+    def crear_reserva(self, cliente, servicio, duracion):
+        try:
+            reserva = Reserva(cliente, servicio, duracion)
+            self.reservas.append(reserva)
+            logger.info(f"Reservation created: {reserva.identificador}")
+            return reserva
+        except Exception as error:
+            logger.exception("Error creating a reservation.")
+            raise ReservaInvalidaError("It was not possible to create the reservation.") from error
+
+    def listar_clientes(self):
+        return self.clientes
+
+    def listar_servicios(self):
+        return self.servicios
+
+    def listar_reservas(self):
+        return self.reservas
+
+# =====================================================
+# 11. Demontration  Of 13 Operations
+# =====================================================
+
+def ejecutar_demostracion(gestor):
+    print("\n========== SOFTWARE FJ DEMONSTRATION ==========\n")
+    operaciones = 0
+
+    def ejecutar(nombre, funcion):
+        nonlocal operaciones
+        operaciones += 1
+        print(f"\nOPERATION {operaciones}: {nombre}")
+        try:
+            resultado = funcion()
+        except Exception as error:
+            logger.exception(f"Operation {operaciones} failed: {nombre}")
+            print(f"Controlled error: {error}")
+        else:
+            print("Result:", resultado)
+        finally:
+            print("Operation finished.")
+
+    ejecutar("Valid client registration", lambda: gestor.registrar_cliente(Cliente("Carlos Perez", "carlos@gmail.com", "3001234567")).describir())
+    ejecutar("Second client registration", lambda: gestor.registrar_cliente(Cliente("Laura Gomez", "laura@gmail.com", "3017654321")).describir())
+    ejecutar("Client registration without name", lambda: Cliente("", "error@gmail.com", "3001234567"))
+    ejecutar("Duplicate email registration", lambda: gestor.registrar_cliente(Cliente("Pedro Ruiz", "carlos@gmail.com", "3101234567")))
+    ejecutar("Available services query", lambda: [s.describir() for s in gestor.servicios])
+    ejecutar("Room reservation cost calculation", lambda: gestor.servicios[0].calcular_costo(2, 19, 10))
+    ejecutar("Calculation with negative duration", lambda: gestor.servicios[1].calcular_costo(-2))
+
+    cliente = gestor.clientes[0]
+    ejecutar("Valid reservation creation", lambda: gestor.crear_reserva(cliente, gestor.servicios[0], 2).describir())
+    reserva = gestor.reservas[0]
+    ejecutar("Reservation confirmation", lambda: confirmar_y_describir(reserva))
+    ejecutar("Reservation processing and calculation", lambda: reserva.procesar(19, 5))
+    ejecutar("Reservation with incorrect duration", lambda: gestor.crear_reserva(cliente, gestor.servicios[0], 30))
+    ejecutar("Reservation cancellation", lambda: cancelar_y_describir(reserva))
+    ejecutar("Confirmation of cancelled reservation", lambda: reserva.confirmar())
+
+    print("\n==============================================")
+    print(f"Total operations performed: {operaciones}")
+    print("The system keeps working.")
+    print("Errors were recorded in software_fj.log")
+    print("==============================================\n")
+
+def confirmar_y_describir(reserva):
+    reserva.confirmar()
+    return reserva.describir()
+
+def cancelar_y_describir(reserva):
+    reserva.cancelar()
+    return reserva.describir()
+
+# =====================================================
+# 12. Graphical Iterface  With TKINTER - In English
+# =====================================================
+
+class AplicacionSoftwareFJ:
+
+    def __init__(self, ventana):
+        self.ventana = ventana
+        self.ventana.title("Software FJ - Integrated System")
+        self.ventana.geometry("1050x720")
+        self.ventana.minsize(850, 600)
+        self.gestor = GestorSistema()
+        self.crear_interfaz()
+
+    def crear_interfaz(self):
+        titulo = tk.Label(self.ventana, text="SOFTWARE FJ", font=("Arial", 24, "bold"), fg="#174A75")
+        titulo.pack(pady=10)
+        subtitulo = tk.Label(self.ventana, text="Integrated Client, Service and Reservation Management System", font=("Arial", 11))
+        subtitulo.pack(pady=5)
+
+        self.pestanas = ttk.Notebook(self.ventana)
+        self.pestanas.pack(fill="both", expand=True, padx=15, pady=10)
+
+        self.pestana_clientes = ttk.Frame(self.pestanas)
+        self.pestana_reservas = ttk.Frame(self.pestanas)
+        self.pestana_servicios = ttk.Frame(self.pestanas)
+        self.pestana_logs = ttk.Frame(self.pestanas)
+
+        self.pestanas.add(self.pestana_clientes, text="Clients")
+        self.pestanas.add(self.pestana_servicios, text="Services")
+        self.pestanas.add(self.pestana_reservas, text="Reservations")
+        self.pestanas.add(self.pestana_logs, text="Event Log")
+
+        self.crear_pestana_clientes()
+        self.crear_pestana_servicios()
+        self.crear_pestana_reservas()
+        self.crear_pestana_logs()
+
