@@ -6,7 +6,7 @@ import logging
 import uuid
 
 # =====================================================
-# 1. Configuracion del Sistema de  Registro  (LOGS)
+# 1. Configuracion del Sistema de  Registro 
 # =====================================================
 
 logging.basicConfig(
@@ -108,7 +108,7 @@ class Cliente(Entidad):
         return f"Client: {self.__nombre} | Email: {self.__correo} | Phone: {self.__telefono}"
 
 # =====================================================
-# 5. Abstract  Class Servicio
+# 5. Clase Abstracta Servicio 
 # =====================================================
 
 class Servicio(Entidad, ABC):
@@ -173,7 +173,7 @@ class Servicio(Entidad, ABC):
         pass
 
 # =====================================================
-# 6. Room Reservattion Services
+# 6. Servicio de Reserva de sala
 # =====================================================
 
 class ReservaSala(Servicio):
@@ -193,7 +193,7 @@ class ReservaSala(Servicio):
         return super().calcular_costo(duracion, impuesto, descuento)
 
 # =====================================================
-# 7. Equipment Rental  Service
+# 7. Servicio de Alquiler de equipos 
 # =====================================================
 
 class AlquilerEquipos(Servicio):
@@ -213,7 +213,7 @@ class AlquilerEquipos(Servicio):
         return super().calcular_costo(duracion, impuesto, descuento)
 
 # =====================================================
-# 8. Specialized Consuting Service
+# 8. Servico de Asesoria Especializada
 # =====================================================
 
 class AsesoriaEspecializada(Servicio):
@@ -233,7 +233,7 @@ class AsesoriaEspecializada(Servicio):
         return super().calcular_costo(duracion, impuesto, descuento)
 
 # =====================================================
-# 9. Class Reserva
+# 9. Clase Reserva
 # =====================================================
 
 class Reserva(Entidad):
@@ -301,7 +301,7 @@ class Reserva(Entidad):
         return f"Reservation: {self.identificador} | Client: {self.cliente.nombre} | Service: {self.servicio.nombre} | Duration: {self.duracion} hours | Status: {self.estado}"
 
 # =====================================================
-# 10. System Manager Class
+# 10. Clase Gestor de Sistema
 # =====================================================
 
 class GestorSistema:
@@ -345,7 +345,7 @@ class GestorSistema:
         return self.reservas
 
 # =====================================================
-# 11. Demontration  Of 13 Operations
+# 11. Demostracion de las 13 operaciones
 # =====================================================
 
 def ejecutar_demostracion(gestor):
@@ -398,7 +398,7 @@ def cancelar_y_describir(reserva):
     return reserva.describir()
 
 # =====================================================
-# 12. Graphical Iterface  With TKINTER - In English
+# 12. Intefaz Grafica En Ingles 
 # =====================================================
 
 class AplicacionSoftwareFJ:
