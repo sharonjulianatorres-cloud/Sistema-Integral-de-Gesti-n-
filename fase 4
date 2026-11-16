@@ -434,4 +434,234 @@ class AplicacionSoftwareFJ:
         self.crear_pestana_servicios()
         self.crear_pestana_reservas()
         self.crear_pestana_logs()
+# -------------------------------------------------
+    # Clients Tab
+    # -------------------------------------------------
 
+    def crear_pestana_clientes(self):
+        marco = ttk.LabelFrame(self.pestana_clientes, text="Register new client")
+        marco.pack(fill="x", padx=20, pady=15)
+
+        ttk.Label(marco, text="Name:").grid(row=0, column=0, padx=10, pady=10)
+        self.nombre = ttk.Entry(marco, width=35)
+        self.nombre.grid(row=0, column=1, padx=10, pady=10)
+
+        ttk.Label(marco, text="Email:").grid(row=1, column=0, padx=10, pady=10)
+        self.correo = ttk.Entry(marco, width=35)
+        self.correo.grid(row=1, column=1, padx=10, pady=10)
+
+        ttk.Label(marco, text="Phone:").grid(row=2, column=0, padx=10, pady=10)
+        self.telefono = ttk.Entry(marco, width=35)
+        self.telefono.grid(row=2, column=1, padx=10, pady=10)
+
+        ttk.Button(marco, text="Register Client", command=self.registrar_cliente).grid(row=3, column=0, columnspan=2, pady=15)
+
+        self.lista_clientes = tk.Listbox(self.pestana_clientes, height=12)
+        self.lista_clientes.pack(fill="both", expand=True, padx=20, pady=10)
+
+    def registrar_cliente(self):
+        try:
+            cliente = Cliente(self.nombre.get(), self.correo.get(), self.telefono.get())
+            self.gestor.registrar_cliente(cliente)
+        except Exception as error:
+            logger.exception("Error in client form.")
+            messagebox.showerror("Error", str(error))
+        else:
+            self.lista_clientes.insert(tk.END, cliente.describir())
+            self.nombre.delete(0, tk.END)
+            self.correo.delete(0, tk.END)
+            self.telefono.delete(0, tk.END)
+            self.actualizar_clientes()  # FIXED: refresh combo in Reservations
+            messagebox.showinfo("Success", "Client registered successfully.")
+        finally:
+            self.actualizar_logs()
+
+    # -------------------------------------------------
+    # Services Tab
+    # -------------------------------------------------
+
+    def crear_pestana_servicios(self):
+        ttk.Label(self.pestana_servicios, text="Available Services at Software FJ", font=("Arial", 15, "bold")).pack(pady=15)
+        self.lista_servicios = tk.Listbox(self.pestana_servicios, font=("Arial", 12), height=12)
+        self.lista_servicios.pack(fill="both", expand=True, padx=20, pady=10)
+        for servicio in self.gestor.listar_servicios():
+            self.lista_servicios.insert(tk.END, servicio.describir())
+        ttk.Button(self.pestana_servicios, text="Refresh Services", command=self.actualizar_servicios).pack(pady=10)
+
+    def actualizar_servicios(self):
+        self.lista_servicios.delete(0, tk.END)
+        for servicio in self.gestor.listar_servicios():
+            self.lista_servicios.insert(tk.END, servicio.describir())
+
+    # -------------------------------------------------
+    # Reservations Tab
+    # -------------------------------------------------
+
+    def crear_pestana_reservas(self):
+        marco = ttk.LabelFrame(self.pestana_reservas, text="Create Reservation")
+        marco.pack(fill="x", padx=20, pady=15)
+
+        ttk.Label(marco, text="Client:").grid(row=0, column=0, padx=10, pady=10)
+        self.combo_cliente = ttk.Combobox(marco, width=35, state="readonly")
+        self.combo_cliente.grid(row=0, column=1, padx=10, pady=10)
+
+        ttk.Label(marco, text="Service:").grid(row=1, column=0, padx=10, pady=10)
+        self.combo_servicio = ttk.Combobox(marco, width=35, state="readonly", values=[s.nombre for s in self.gestor.servicios])
+        self.combo_servicio.grid(row=1, column=1, padx=10, pady=10)
+        self.combo_servicio.current(0)
+
+        ttk.Label(marco, text="Duration (hours):").grid(row=2, column=0, padx=10, pady=10)
+        self.duracion = ttk.Entry(marco, width=38)
+        self.duracion.grid(row=2, column=1, padx=10, pady=10)
+
+        ttk.Button(marco, text="Create Reservation", command=self.crear_reserva).grid(row=3, column=0, columnspan=2, pady=10)
+
+        self.lista_reservas = tk.Listbox(self.pestana_reservas, height=12)
+        self.lista_reservas.pack(fill="both", expand=True, padx=20, pady=10)
+
+        botones = ttk.Frame(self.pestana_reservas)
+        botones.pack(pady=10)
+        ttk.Button(botones, text="Confirm Reservation", command=self.confirmar_reserva).pack(side="left", padx=10)
+        ttk.Button(botones, text="Process Reservation", command=self.procesar_reserva).pack(side="left", padx=10)
+        ttk.Button(botones, text="Cancel Reservation", command=self.cancelar_reserva).pack(side="left", padx=10)
+
+        self.actualizar_clientes()
+
+    def actualizar_clientes(self):
+        self.combo_cliente["values"] = [f"{c.identificador} - {c.nombre}" for c in self.gestor.listar_clientes()]
+
+    def crear_reserva(self):
+        try:
+            seleccion_cliente = self.combo_cliente.get()
+            if not seleccion_cliente:
+                raise DatosInvalidosError("You must select a client.")
+            identificador = seleccion_cliente.split(" - ")[0]
+            cliente = self.gestor.buscar_cliente(identificador)
+            nombre_servicio = self.combo_servicio.get()
+            servicio = next((s for s in self.gestor.servicios if s.nombre == nombre_servicio), None)
+            if servicio is None:
+                raise ServicioNoDisponibleError("You must select a valid service.")
+            try:
+                duracion = float(self.duracion.get())
+            except ValueError as error:
+                raise DatosInvalidosError("Duration must be a number.") from error
+            reserva = self.gestor.crear_reserva(cliente, servicio, duracion)
+        except Exception as error:
+            logger.exception("Error in reservation form.")
+            messagebox.showerror("Error", str(error))
+        else:
+            self.lista_reservas.insert(tk.END, reserva.describir())
+            self.duracion.delete(0, tk.END)
+            messagebox.showinfo("Reservation Created", "The reservation was created successfully.")
+        finally:
+            self.actualizar_logs()
+
+    def obtener_reserva_seleccionada(self):
+        seleccion = self.lista_reservas.curselection()
+        if not seleccion:
+            raise ReservaInvalidaError("Select a reservation from the list.")
+        return self.gestor.reservas[seleccion[0]], seleccion[0]
+
+    def actualizar_reserva_visual(self, reserva, indice):
+        self.lista_reservas.delete(indice)
+        self.lista_reservas.insert(indice, reserva.describir())
+
+    def confirmar_reserva(self):
+        try:
+            reserva, indice = self.obtener_reserva_seleccionada()
+            reserva.confirmar()
+        except Exception as error:
+            logger.exception("Error confirming reservation.")
+            messagebox.showerror("Error", str(error))
+        else:
+            self.actualizar_reserva_visual(reserva, indice)
+            messagebox.showinfo("Success", "Reservation confirmed.")
+        finally:
+            self.actualizar_logs()
+
+    def procesar_reserva(self):
+        try:
+            reserva, indice = self.obtener_reserva_seleccionada()
+            total = reserva.procesar(19, 0)
+        except Exception as error:
+            logger.exception("Error processing reservation.")
+            messagebox.showerror("Error", str(error))
+        else:
+            messagebox.showinfo("Processing Successful", f"The total value of the reservation is:\n${total:,.2f}")
+        finally:
+            self.actualizar_logs()
+
+    def cancelar_reserva(self):
+        try:
+            reserva, indice = self.obtener_reserva_seleccionada()
+            reserva.cancelar()
+        except Exception as error:
+            logger.exception("Error cancelling reservation.")
+            messagebox.showerror("Error", str(error))
+        else:
+            self.actualizar_reserva_visual(reserva, indice)
+            messagebox.showinfo("Success", "Reservation cancelled.")
+        finally:
+            self.actualizar_logs()
+
+    # -------------------------------------------------
+    # Event Log Tab
+    # -------------------------------------------------
+
+    def crear_pestana_logs(self):
+        ttk.Label(self.pestana_logs, text="Event and Error Log", font=("Arial", 14, "bold")).pack(pady=10)
+        self.texto_logs = scrolledtext.ScrolledText(self.pestana_logs, width=100, height=25, state="disabled")
+        self.texto_logs.pack(fill="both", expand=True, padx=15, pady=10)
+        botones = ttk.Frame(self.pestana_logs)
+        botones.pack(pady=10)
+        ttk.Button(botones, text="Refresh Logs", command=self.actualizar_logs).pack(side="left", padx=10)
+        ttk.Button(botones, text="Run Demonstration of 13 Operations", command=self.demostracion).pack(side="left", padx=10)
+
+    def actualizar_logs(self):
+        self.texto_logs.configure(state="normal")
+        self.texto_logs.delete("1.0", tk.END)
+        try:
+            with open("software_fj.log", "r", encoding="utf-8") as archivo:
+                contenido = archivo.read()
+                self.texto_logs.insert(tk.END, contenido)
+        except FileNotFoundError:
+            self.texto_logs.insert(tk.END, "No records yet.")
+        except OSError as error:
+            logger.exception("Could not read log file.")
+            self.texto_logs.insert(tk.END, f"Error reading logs: {error}")
+        finally:
+            self.texto_logs.configure(state="disabled")
+
+    def demostracion(self):
+        try:
+            ejecutar_demostracion(self.gestor)
+            self.actualizar_clientes()
+            self.actualizar_servicios()
+            self.lista_clientes.delete(0, tk.END)
+            for cliente in self.gestor.clientes:
+                self.lista_clientes.insert(tk.END, cliente.describir())
+            self.lista_reservas.delete(0, tk.END)
+            for reserva in self.gestor.reservas:
+                self.lista_reservas.insert(tk.END, reserva.describir())
+            messagebox.showinfo("Demonstration Finished", "13 test operations were executed.\nCheck the console and the software_fj.log file.")
+        except Exception as error:
+            logger.exception("General error in demonstration.")
+            messagebox.showerror("Error", str(error))
+        finally:
+            self.actualizar_logs()
+
+# =====================================================
+# 13. Main Program Execution
+# =====================================================
+
+if _name_ == "_main_":
+    try:
+        ventana = tk.Tk()
+        aplicacion = AplicacionSoftwareFJ(ventana)
+        logger.info("Software FJ system started successfully.")
+        ventana.mainloop()
+    except Exception as error:
+        logger.exception("Critical error starting the system.")
+        print("It was not possible to start the system:", error)
+    finally:
+        logger.info("Program execution finished.")
