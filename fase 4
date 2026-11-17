@@ -653,8 +653,7 @@ class AplicacionSoftwareFJ:
 # =====================================================
 # 13. Main Program Execution
 # =====================================================
-
-if _name_ == "_main_":
+if __name__ == "__main__":
     try:
         ventana = tk.Tk()
         aplicacion = AplicacionSoftwareFJ(ventana)
